@@ -1,0 +1,91 @@
+name: CEREBRON Farm 19 Cybersecurity
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os
+          roles=[
+          ('SECURITY_ARCHITECT','Security architecture, trust boundaries and defense in depth'),
+          ('THREAT_MODELER','Threat modeling, attack surfaces and abuse cases'),
+          ('IAM_SPECIALIST','Identity, authentication, authorization and least privilege'),
+          ('NETWORK_DEFENSE','Segmentation, network controls, monitoring and resilience'),
+          ('APPSEC_SPECIALIST','Secure SDLC, code review and application security'),
+          ('CLOUD_SECURITY','Cloud posture, workload isolation and configuration risk'),
+          ('CRYPTO_REVIEWER','Cryptographic design review and misuse detection'),
+          ('SUPPLY_CHAIN_SECURITY','Dependencies, provenance, SBOM and build-chain integrity'),
+          ('DETECTION_ENGINEER','Defensive telemetry, detections and alert quality'),
+          ('INCIDENT_RESPONDER','Containment, eradication, recovery and lessons learned'),
+          ('VULNERABILITY_AUDITOR','Vulnerability triage, severity evidence and remediation'),
+          ('SECURE_CONFIG_AUDITOR','Hardening, baselines and configuration drift'),
+          ('DATA_PROTECTION','Data classification, encryption and exposure reduction'),
+          ('RESILIENCE_ENGINEER','Recovery, redundancy, backup and service continuity'),
+          ('ZERO_TRUST_AUDITOR','Continuous verification and trust minimization'),
+          ('DEFENSIVE_RED_TEAM','Adversarial review limited to safe defensive analysis'),
+          ('REPLICATOR','Independent replication of security claims and mitigations'),
+          ('EVIDENCE_AUDITOR','Evidence quality, assumptions, provenance and uncertainty'),
+          ('SECURITY_SYNTHESIZER','Fuse findings without inflating confidence'),
+          ('OMEGA_JUDGE','Final defensive judgment, residual risks and next tests')]
+          models=['huggingface-projects/llama-3.2-3B-Instruct','huggingface-projects/gemma-2-9b-it']
+          inc=[]
+          for i,(r,f) in enumerate(roles): inc.append({'role':r,'focus':f,'model':models[i%2]})
+          matrix=json.dumps({'include':inc})
+          with open(os.environ['GITHUB_OUTPUT'],'a') as fh: fh.write('matrix='+matrix+'\n')
+          PY
+  security-agent:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -q hf-gradio
+      - name: Run defensive security role
+        run: python scripts/security_agent.py "${{ matrix.role }}" "${{ matrix.model }}" "${{ matrix.focus }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: farm19-${{ matrix.role }}
+          path: out/${{ matrix.role }}.json
+  omega-fusion:
+    if: always()
+    needs: [security-agent]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: farm19-*
+          path: packet
+          merge-multiple: true
+      - shell: bash
+        run: |
+          python - <<'PY'
+          import json, glob, pathlib
+          rows=[]
+          for p in glob.glob('packet/*.json'):
+              try: rows.append(json.load(open(p)))
+              except: pass
+          out={'farm':'19-cybersecurity','roles_returned':len(rows),'successful_external_ai_calls':sum(bool(x.get('inference_success')) for x in rows),'model_families':sorted(set(x.get('model') for x in rows if x.get('model'))),'epistemic_status':'UNREVIEWED_EXTERNAL_AGENT_OUTPUT','results':rows}
+          pathlib.Path('omega').mkdir(exist_ok=True)
+          pathlib.Path('omega/farm19-omega.json').write_text(json.dumps(out,ensure_ascii=False,indent=2))
+          print(json.dumps({k:v for k,v in out.items() if k!='results'},indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: farm19-omega-packet
+          path: omega/farm19-omega.json
