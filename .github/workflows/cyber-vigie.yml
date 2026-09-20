@@ -5,7 +5,7 @@ on:
     - cron: '*/5 * * * *'
   push:
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: cyber-vigie
   cancel-in-progress: false
@@ -33,11 +33,23 @@ jobs:
               for rx,label in risky:
                   if rx.search(s): findings.append({"file":str(p),"type":label})
           decision="BLOCK" if findings else "NORMAL"
-          out={"schema":"CYBER_VIGIE_V1","decision":decision,"findings":findings,"cyber_iq":{"status":"MEASUREMENT_PENDING","dimensions":["DETECT","RESIST","CONTAIN","RECOVER","AUDIT"]},"rules":["DEFENSE_ONLY","UNKNOWN=HOLD","PRIVILEGE_ESCALATION=QUARANTINE","SAFETY_BYPASS=QUARANTINE"]}
+          out={"schema":"CYBER_VIGIE_V2","resource":os.environ.get("GITHUB_REPOSITORY"),"decision":decision,"guardian_status":"PASS" if decision=="NORMAL" else "BLOCK","findings":findings,"cyber_iq":{"status":"MEASUREMENT_PENDING","dimensions":["DETECT","RESIST","CONTAIN","RECOVER","AUDIT"]},"rules":["DEFENSE_ONLY","UNKNOWN=HOLD","PRIVILEGE_ESCALATION=QUARANTINE","SAFETY_BYPASS=QUARANTINE"]}
           pathlib.Path("cyber-vigie.json").write_text(json.dumps(out,indent=2))
+          pathlib.Path("agora").mkdir(exist_ok=True)
+          pathlib.Path("agora/state.json").write_text(json.dumps(out,indent=2))
           print(json.dumps(out,indent=2))
           if findings: raise SystemExit("CYBER VIGIE BLOCK: possible secret material detected")
           PY
+      - name: Publish durable Cyber Vigie packet
+        if: success()
+        shell: bash
+        run: |
+          git config user.name "cerebron-cyber-vigie"
+          git config user.email "actions@users.noreply.github.com"
+          git add agora/state.json
+          git diff --cached --quiet && exit 0
+          git commit -m "CYBER VIGIE state ${GITHUB_RUN_ID}"
+          git push
       - uses: actions/upload-artifact@v4
         if: always()
         with:
