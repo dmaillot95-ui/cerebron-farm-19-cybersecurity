@@ -1,0 +1,23 @@
+{
+  "schema": "CYBER_VIGIE_V2",
+  "resource": "dmaillot95-ui/cerebron-farm-19-cybersecurity",
+  "decision": "NORMAL",
+  "guardian_status": "PASS",
+  "findings": [],
+  "cyber_iq": {
+    "status": "MEASUREMENT_PENDING",
+    "dimensions": [
+      "DETECT",
+      "RESIST",
+      "CONTAIN",
+      "RECOVER",
+      "AUDIT"
+    ]
+  },
+  "rules": [
+    "DEFENSE_ONLY",
+    "UNKNOWN=HOLD",
+    "PRIVILEGE_ESCALATION=QUARANTINE",
+    "SAFETY_BYPASS=QUARANTINE"
+  ]
+}
