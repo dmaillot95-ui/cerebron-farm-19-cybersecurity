@@ -19,7 +19,7 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
-          import pathlib,re,json,hashlib
+          import pathlib,re,json,hashlib,os
           risky=[
             (re.compile(r'AKIA[0-9A-Z]{16}'),"AWS_KEY_PATTERN"),
             (re.compile(r'gh[pousr]_[A-Za-z0-9_]{20,}'),"GITHUB_TOKEN_PATTERN"),
